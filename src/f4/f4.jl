@@ -1,5 +1,5 @@
 # Main file that defines the f4! function.
-
+percent(x) = round(100 * x, digits=2)
 # Functions here mostly accept or output a subset of these objects:
 # ring - current polynomial ring,
 # basis - a struct that stores polynomials,
@@ -691,6 +691,11 @@ function f4!(
 
     matrix = initialize_matrix(ring, C)
 
+    # FOR BENCHMARKING
+    max_mat_size = (zero(Int), zero(Int))
+    dens = zero(Float32)
+    # FOR BENCHMARKING
+
     # initialize hash tables for update and symbolic preprocessing steps
     update_ht = initialize_secondary_hashtable(hashtable)
     symbol_ht = initialize_secondary_hashtable(hashtable)
@@ -745,6 +750,14 @@ function f4!(
 
         symbolic_preprocessing!(basis, matrix, hashtable, symbol_ht)
 
+        # FOR BENCHMARKING
+        curr_mat_size = (matrix.nrows, matrix.ncolumns)
+        if prod(curr_mat_size) > prod(max_mat_size)
+            max_mat_size = curr_mat_size
+            dens = compute_density(matrix)
+        end
+        # FOR BENCHMARKING
+
         # reduces polys and obtains new potential basis elements
         reduction!(ring, basis, matrix, hashtable, symbol_ht, params)
 
@@ -790,6 +803,8 @@ function f4!(
 
     # @invariant hashtable_well_formed(:output_f4!, ring, hashtable)
     @invariant basis_well_formed(:output_f4!, ring, basis, hashtable)
+
+    println("maximal matrix size: $(max_mat_size), density $(percent(dens))%")
 
     nothing
 end
@@ -839,10 +854,44 @@ function f4_normalform!(
     # Fill the matrix
     select_tobereduced!(basis, tobereduced, matrix, symbol_ht, ht)
     symbolic_preprocessing!(basis, matrix, ht, symbol_ht)
+
+    # FOR BENCHMARKING
+    dens = compute_density(matrix)
+    m_size = (matrix.nrows, matrix.ncolumns)
+    println("matrix size $(m_size), density $(percent(dens))%")
+    # FOR BENCHMARKING
+    
     column_to_monom_mapping!(matrix, symbol_ht)
     # Reduce the matrix
     linear_algebra_normalform!(matrix, basis, arithmetic)
     # Export the rows of the matrix back to the basis elements
     convert_rows_to_basis_elements_nf!(matrix, tobereduced, ht, symbol_ht)
     tobereduced
+end
+
+function compute_density(matrix::MacaulayMatrix)
+    mat_size = matrix.nrows * matrix.ncolumns
+    nnz_A, nnz_B, nnz_C, nnz_D = 0, 0, 0, 0
+    for i in 1:(matrix.nupper)
+        row = matrix.upper_rows[i]
+        for j in 1:length(row)
+            if row[j] <= matrix.nleft
+                nnz_A += 1
+            else
+                nnz_B += 1
+            end
+        end
+    end
+    for i in 1:(matrix.nlower)
+        row = matrix.lower_rows[i]
+        for j in 1:length(row)
+            if row[j] <= matrix.nleft
+                nnz_C += 1
+            else
+                nnz_D += 1
+            end
+        end
+    end
+    nnz = nnz_A + nnz_B + nnz_C + nnz_D
+    return nnz/mat_size
 end
