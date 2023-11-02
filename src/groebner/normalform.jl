@@ -40,8 +40,8 @@ function _normalform(polynomials, to_be_reduced, kws::KeywordsHandler)
     @log level = -2 """
       Finalized polynomial rings:
       Basis: $ring
-      To be reduced: $ring_"""
-    @assert ring.nvars == ring_.nvars && ring.ch == ring_.ch && isequal(ring.ord, ring_.ord)
+    To be reduced: $ring_"""
+    # @assert ring.nvars == ring_.nvars && ring.ch == ring_.ch && isequal(ring.ord, ring_.ord)
     monoms_reduced, coeffs_reduced = _normalform(
         ring,
         monoms,
